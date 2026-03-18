@@ -37,32 +37,44 @@ def main():
 
     y_true = merged["has_perturbation"].astype(bool)
     y_pred = merged["screened_positive"].astype(bool)
-
-    lines = []
-    lines.append("=== Screening (has_perturbation) ===")
-    lines.append(f"  Accuracy:  {accuracy_score(y_true, y_pred):.3f}")
-    lines.append(f"  Precision: {precision_score(y_true, y_pred, zero_division=0):.3f}")
-    lines.append(f"  Recall:    {recall_score(y_true, y_pred, zero_division=0):.3f}")
-    lines.append(f"  F1:        {f1_score(y_true, y_pred, zero_division=0):.3f}")
-    lines.append(f"  N:         {len(merged)}")
-
-    lines.append("")
-    lines.append("=== Field Extraction Accuracy (positives only) ===")
-
     pos = merged[merged["has_perturbation"] == True]
+
+    rows = [
+        {"metric": "accuracy",  "group": "screening", "value": accuracy_score(y_true, y_pred),                   "n": len(merged)},
+        {"metric": "precision", "group": "screening", "value": precision_score(y_true, y_pred, zero_division=0), "n": len(merged)},
+        {"metric": "recall",    "group": "screening", "value": recall_score(y_true, y_pred, zero_division=0),    "n": len(merged)},
+        {"metric": "f1",        "group": "screening", "value": f1_score(y_true, y_pred, zero_division=0),        "n": len(merged)},
+    ]
     for pred_col, truth_col, label in [
-        ("tf_name_pred",            "tf_name_truth",            "tf_name"),
-        ("perturbation_method_pred","perturbation_method_truth","perturbation_method"),
-        ("organism_pred",           "organism_truth",           "organism"),
-        ("platform_pred",           "platform_truth",           "platform"),
+        ("tf_name_pred",             "tf_name_truth",             "tf_name"),
+        ("perturbation_method_pred", "perturbation_method_truth", "perturbation_method"),
+        ("organism_pred",            "organism_truth",            "organism"),
+        ("platform_pred",            "platform_truth",            "platform"),
     ]:
         acc, n = field_accuracy(pos, pred_col, truth_col)
-        lines.append(f"  {label:<22} {acc:.3f}  (n={n})")
+        rows.append({"metric": label, "group": "extraction", "value": acc, "n": n})
 
-    report = "\n".join(lines)
-    print(report)
-    with open(args.output, "w") as f:
-        f.write(report + "\n")
+    scores = pd.DataFrame(rows)
+    scores.to_csv(args.output, sep="\t", index=False)
+
+    # human-readable report
+    screening = scores[scores["group"] == "screening"].set_index("metric")
+    extraction = scores[scores["group"] == "extraction"].set_index("metric")
+
+    lines = [
+        "=== Screening (has_perturbation) ===",
+        f"  Accuracy:  {screening.loc['accuracy',  'value']:.3f}",
+        f"  Precision: {screening.loc['precision', 'value']:.3f}",
+        f"  Recall:    {screening.loc['recall',    'value']:.3f}",
+        f"  F1:        {screening.loc['f1',        'value']:.3f}",
+        f"  N:         {int(screening.loc['accuracy', 'n'])}",
+        "",
+        "=== Field Extraction Accuracy (positives only) ===",
+    ]
+    for metric, row in extraction.iterrows():
+        lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
+
+    print("\n".join(lines))
 
 
 if __name__ == "__main__":

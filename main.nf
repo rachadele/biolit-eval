@@ -63,21 +63,38 @@ publishDir params.outdir, mode: 'copy'
 }
 
 process SCORE {
-publishDir params.outdir, mode: 'copy'
+    publishDir params.outdir, mode: 'copy'
 
     input:
     path predictions
     path ground_truth
 
     output:
-    path 'scores.txt'
+    path 'scores.tsv'
 
     script:
     """
     score_eval.py \
         --predictions ${predictions} \
         --ground_truth ${ground_truth} \
-        --output scores.txt
+        --output scores.tsv
+    """
+}
+
+process PLOT {
+    publishDir params.outdir, mode: 'copy'
+
+    input:
+    path scores
+
+    output:
+    path 'scores.png'
+
+    script:
+    """
+    plot_scores.py \
+        --scores ${scores} \
+        --output scores.png
     """
 }
 
@@ -87,5 +104,6 @@ workflow {
     SAMPLE(ground_truth)
     biolit_csv  = RUN_BIOLIT(SAMPLE.out.ids)
     predictions = PARSE_PREDICTIONS(biolit_csv, SAMPLE.out.sample)
-    SCORE(predictions, ground_truth)
+    scores      = SCORE(predictions, ground_truth)
+    PLOT(scores)
 }
