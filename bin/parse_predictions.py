@@ -25,17 +25,13 @@ def main():
             rows.append({
                 "geo_accession": acc,
                 "screened_positive": True,
-                "tf_name": row.get("transcription_factor", ""),
-                "perturbation_method": row.get("perturbation_method", ""),
-                "organism": row.get("organism", ""),
-                "platform": row.get("platform", ""),
+                "organism": row.get("organism_scientific_name", ""),
+                "platform": row.get("platform_gpl_accession", ""),
             })
         else:
             rows.append({
                 "geo_accession": acc,
                 "screened_positive": False,
-                "tf_name": "",
-                "perturbation_method": "",
                 "organism": "",
                 "platform": "",
             })

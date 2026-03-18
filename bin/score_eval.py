@@ -46,10 +46,8 @@ def main():
         {"metric": "f1",        "group": "screening", "value": f1_score(y_true, y_pred, zero_division=0),        "n": len(merged)},
     ]
     for pred_col, truth_col, label in [
-        ("tf_name_pred",             "tf_name_truth",             "tf_name"),
-        ("perturbation_method_pred", "perturbation_method_truth", "perturbation_method"),
-        ("organism_pred",            "organism_truth",            "organism"),
-        ("platform_pred",            "platform_truth",            "platform"),
+        ("organism_pred", "organism_truth", "organism"),
+        ("platform_pred", "platform_truth", "platform"),
     ]:
         acc, n = field_accuracy(pos, pred_col, truth_col)
         rows.append({"metric": label, "group": "extraction", "value": acc, "n": n})
