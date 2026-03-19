@@ -50,6 +50,8 @@ def main():
                         help="Ground truth column for screening evaluation")
     parser.add_argument("--field_map", default=None,
                         help="Optional key:value,... override for biolit→ground-truth column mapping")
+    parser.add_argument("--jaccard_fields", default=None,
+                        help="Comma-separated field names to score with Jaccard instead of exact match")
     parser.add_argument("--output", required=True)
     parser.add_argument("--merged_output", default=None, help="Optional path to write merged predictions+ground truth TSV")
     args = parser.parse_args()
@@ -58,6 +60,7 @@ def main():
         config = json.load(f)
     # fields dict keys are biolit output column names; default truth col = same name
     field_map = {k: k for k in config.get("fields", {}).keys()}
+    jaccard_fields = set(args.jaccard_fields.split(",")) if args.jaccard_fields else set()
 
     # allow runtime override: biolit_field:truth_col,...
     if args.field_map:
@@ -86,8 +89,15 @@ def main():
         tc = f"{truth_col}_truth" if f"{truth_col}_truth" in merged.columns else truth_col
         if pred_col not in merged.columns or tc not in merged.columns:
             continue
-        acc, n = field_jaccard(pos, pred_col, tc)
-        rows.append({"metric": truth_col, "group": "extraction", "value": acc, "n": n})
+        if biolit_field in jaccard_fields:
+            val, n = field_jaccard(pos, pred_col, tc)
+            group = "extraction_jaccard"
+        else:
+            sub = pos[pos[tc].apply(norm) != ""]
+            val = sub.apply(lambda r: norm(r[pred_col]) == norm(r[tc]), axis=1).mean() if not sub.empty else float("nan")
+            n = len(sub)
+            group = "extraction_exact"
+        rows.append({"metric": truth_col, "group": group, "value": val, "n": n})
 
     scores = pd.DataFrame(rows)
     scores.to_csv(args.output, sep="\t", index=False)
@@ -97,7 +107,6 @@ def main():
 
     # human-readable report
     screening = scores[scores["group"] == "screening"].set_index("metric")
-    extraction = scores[scores["group"] == "extraction"].set_index("metric")
 
     lines = [
         "=== Screening (has_perturbation) ===",
@@ -107,9 +116,15 @@ def main():
         f"  F1:        {screening.loc['f1',        'value']:.3f}",
         f"  N:         {int(screening.loc['accuracy', 'n'])}",
     ]
-    if not extraction.empty:
+    exact = scores[scores["group"] == "extraction_exact"].set_index("metric")
+    jaccard_ex = scores[scores["group"] == "extraction_jaccard"].set_index("metric")
+    if not exact.empty:
+        lines += ["", "=== Field Extraction Accuracy (positives only) ==="]
+        for metric, row in exact.iterrows():
+            lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
+    if not jaccard_ex.empty:
         lines += ["", "=== Field Extraction Mean Jaccard (positives only) ==="]
-        for metric, row in extraction.iterrows():
+        for metric, row in jaccard_ex.iterrows():
             lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
 
     print("\n".join(lines))

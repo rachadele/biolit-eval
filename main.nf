@@ -92,6 +92,7 @@ process SCORE {
         --config ${biolit_config} \
         --screening_truth_col ${params.screening_truth_col} \
         ${params.field_map ? "--field_map \"${params.field_map}\"" : ""} \
+        ${params.jaccard_fields ? "--jaccard_fields \"${params.jaccard_fields}\"" : ""} \
         --output scores.tsv \
         --merged_output merged.tsv
     """
