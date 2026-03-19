@@ -67,8 +67,8 @@ process SCORE {
     tuple val(fold_id), path(predictions), path(ground_truth), path(biolit_config)
 
     output:
-    tuple val(fold_id), path('scores.tsv'), emit: scores
-    tuple val(fold_id), path('merged.tsv'), emit: merged
+    tuple val(fold_id), path("fold_${fold_id}_scores.tsv"), emit: scores
+    tuple val(fold_id), path("fold_${fold_id}_merged.tsv"), emit: merged
 
     script:
     """
@@ -80,8 +80,8 @@ process SCORE {
         ${params.field_map ? "--field_map \"${params.field_map}\"" : ""} \
         ${params.jaccard_fields ? "--jaccard_fields \"${params.jaccard_fields}\"" : ""} \
         --fold ${fold_id} \
-        --output scores.tsv \
-        --merged_output merged.tsv
+        --output fold_${fold_id}_scores.tsv \
+        --merged_output fold_${fold_id}_merged.tsv
     """
 }
 

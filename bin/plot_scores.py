@@ -15,7 +15,7 @@ def boxplot_panel(ax, scores, group_label, title, ylabel):
     metrics = sub["metric"].unique()
     plot_data = [sub[sub["metric"] == m]["value"].dropna().tolist() for m in metrics]
     ax.boxplot(plot_data, labels=metrics, patch_artist=True)
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, 1.08)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     ax.tick_params(axis="x", rotation=20)
