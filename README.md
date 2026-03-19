@@ -35,6 +35,7 @@ nextflow run main.nf -profile conda --n_pos 20 --n_neg 20 --seed 123
 | `model` | `claude-haiku-4-5-20251001` | LLM model |
 | `criterion` | *Is there a TF perturbation?* | Biolit screening question |
 | `fields` | `organism_scientific_name,platform_gpl_accession` | Fields to extract |
+| `field_map` | `null` | Optional `biolit_field:truth_col,...` mapping override (see below) |
 | `outdir` | `results/` | Output directory |
 
 ## Output
@@ -47,4 +48,5 @@ Results are written to `results/`:
 
 ## Notes
 
-See `notes/tf_name_eval.md` for discussion of TF name evaluation strategy (alias resolution is a planned follow-on).
+- `notes/tf_name_eval.md` — TF name evaluation strategy (alias resolution is a planned follow-on)
+- `notes/field_mapping.md` — field name / prompt coupling and planned decoupling

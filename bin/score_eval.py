@@ -2,6 +2,7 @@
 """Score predictions against ground truth."""
 
 import argparse
+import json
 
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -27,17 +28,34 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--predictions", required=True)
     parser.add_argument("--ground_truth", required=True)
+    parser.add_argument("--config", required=True, help="Biolit config JSON")
+    parser.add_argument("--screening_truth_col", default="has_perturbation",
+                        help="Ground truth column for screening evaluation")
+    parser.add_argument("--field_map", default=None,
+                        help="Optional key:value,... override for biolit→ground-truth column mapping")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--merged_output", default=None, help="Optional path to write merged predictions+ground truth TSV")
     args = parser.parse_args()
+
+    with open(args.config) as f:
+        config = json.load(f)
+    # fields dict keys are biolit output column names; default truth col = same name
+    field_map = {k: k for k in config.get("fields", {}).keys()}
+
+    # allow runtime override: biolit_field:truth_col,...
+    if args.field_map:
+        for pair in args.field_map.split(","):
+            k, v = pair.split(":")
+            field_map[k.strip()] = v.strip()
 
     preds = pd.read_csv(args.predictions, sep="\t")
     truth = pd.read_csv(args.ground_truth, sep="\t")
 
     merged = preds.merge(truth, on="geo_accession", suffixes=("_pred", "_truth"))
 
-    y_true = merged["has_perturbation"].astype(bool)
+    y_true = merged[args.screening_truth_col].astype(bool)
     y_pred = merged["screened_positive"].astype(bool)
-    pos = merged[merged["has_perturbation"] == True]
+    pos = merged[merged[args.screening_truth_col] == True]
 
     rows = [
         {"metric": "accuracy",  "group": "screening", "value": accuracy_score(y_true, y_pred),                   "n": len(merged)},
@@ -45,15 +63,20 @@ def main():
         {"metric": "recall",    "group": "screening", "value": recall_score(y_true, y_pred, zero_division=0),    "n": len(merged)},
         {"metric": "f1",        "group": "screening", "value": f1_score(y_true, y_pred, zero_division=0),        "n": len(merged)},
     ]
-    for pred_col, truth_col, label in [
-        ("organism_pred", "organism_truth", "organism"),
-        ("platform_pred", "platform_truth", "platform"),
-    ]:
-        acc, n = field_accuracy(pos, pred_col, truth_col)
-        rows.append({"metric": label, "group": "extraction", "value": acc, "n": n})
+
+    for biolit_field, truth_col in field_map.items():
+        pred_col = f"{biolit_field}_pred" if f"{biolit_field}_pred" in merged.columns else biolit_field
+        tc = f"{truth_col}_truth" if f"{truth_col}_truth" in merged.columns else truth_col
+        if pred_col not in merged.columns or tc not in merged.columns:
+            continue
+        acc, n = field_accuracy(pos, pred_col, tc)
+        rows.append({"metric": truth_col, "group": "extraction", "value": acc, "n": n})
 
     scores = pd.DataFrame(rows)
     scores.to_csv(args.output, sep="\t", index=False)
+
+    if args.merged_output:
+        merged.to_csv(args.merged_output, sep="\t", index=False)
 
     # human-readable report
     screening = scores[scores["group"] == "screening"].set_index("metric")
@@ -66,11 +89,11 @@ def main():
         f"  Recall:    {screening.loc['recall',    'value']:.3f}",
         f"  F1:        {screening.loc['f1',        'value']:.3f}",
         f"  N:         {int(screening.loc['accuracy', 'n'])}",
-        "",
-        "=== Field Extraction Accuracy (positives only) ===",
     ]
-    for metric, row in extraction.iterrows():
-        lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
+    if not extraction.empty:
+        lines += ["", "=== Field Extraction Accuracy (positives only) ==="]
+        for metric, row in extraction.iterrows():
+            lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
 
     print("\n".join(lines))
 

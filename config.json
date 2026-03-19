@@ -1,0 +1,9 @@
+{
+	"fields": {
+		"tf_name": "HGNC symbol of the transcription factor perturbed in this experiment",
+		"organism": "scientific name of the organism used",
+		"platform": "GPL accession of the microarray platform (found in GEO metadata)"
+	},
+	"criterion": "Is there a transcription factor perturbation in this experiment?",
+	"model": "claude-haiku-4-5-20251001"
+}
