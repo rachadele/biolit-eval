@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import re
 
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -15,13 +16,29 @@ def norm(val):
     return str(val).strip().lower()
 
 
-def field_accuracy(merged, pred_col, truth_col):
-    """Accuracy over rows where ground truth is non-empty."""
+def to_set(val):
+    """Normalize a field value to a set of lowercase tokens, splitting on , / ;"""
+    s = norm(val)
+    if not s:
+        return set()
+    return {t.strip() for t in re.split(r"[,/;]+", s) if t.strip()}
+
+
+def jaccard(a, b):
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def field_jaccard(merged, pred_col, truth_col):
+    """Mean Jaccard similarity over rows where ground truth is non-empty."""
     sub = merged[merged[truth_col].apply(norm) != ""]
     if sub.empty:
         return float("nan"), 0
-    correct = sub.apply(lambda r: norm(r[pred_col]) == norm(r[truth_col]), axis=1)
-    return correct.mean(), len(sub)
+    scores = sub.apply(lambda r: jaccard(to_set(r[pred_col]), to_set(r[truth_col])), axis=1)
+    return scores.mean(), len(sub)
 
 
 def main():
@@ -69,7 +86,7 @@ def main():
         tc = f"{truth_col}_truth" if f"{truth_col}_truth" in merged.columns else truth_col
         if pred_col not in merged.columns or tc not in merged.columns:
             continue
-        acc, n = field_accuracy(pos, pred_col, tc)
+        acc, n = field_jaccard(pos, pred_col, tc)
         rows.append({"metric": truth_col, "group": "extraction", "value": acc, "n": n})
 
     scores = pd.DataFrame(rows)
@@ -91,7 +108,7 @@ def main():
         f"  N:         {int(screening.loc['accuracy', 'n'])}",
     ]
     if not extraction.empty:
-        lines += ["", "=== Field Extraction Accuracy (positives only) ==="]
+        lines += ["", "=== Field Extraction Mean Jaccard (positives only) ==="]
         for metric, row in extraction.iterrows():
             lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
 

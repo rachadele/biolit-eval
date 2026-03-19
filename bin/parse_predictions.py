@@ -2,6 +2,7 @@
 """Map biolit CSV output to predictions.tsv."""
 
 import argparse
+import ast
 import json
 
 import pandas as pd
@@ -31,7 +32,13 @@ def main():
             row = biolit[biolit["geo_accession"] == acc].iloc[0]
             base["screened_positive"] = True
             for biolit_field in fields:
-                base[biolit_field] = row.get(biolit_field, "")
+                val = row.get(biolit_field, "")
+                if isinstance(val, str) and val.startswith("["):
+                    try:
+                        val = ", ".join(ast.literal_eval(val))
+                    except (ValueError, SyntaxError):
+                        pass
+                base[biolit_field] = val
         else:
             base["screened_positive"] = False
             for biolit_field in fields:
