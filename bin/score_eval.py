@@ -54,6 +54,7 @@ def main():
                         help="Comma-separated field names to score with Jaccard instead of exact match")
     parser.add_argument("--output", required=True)
     parser.add_argument("--merged_output", default=None, help="Optional path to write merged predictions+ground truth TSV")
+    parser.add_argument("--fold", type=int, default=None, help="Fold index to stamp into output rows")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -98,6 +99,10 @@ def main():
             n = len(sub)
             group = "extraction_exact"
         rows.append({"metric": truth_col, "group": group, "value": val, "n": n})
+
+    if args.fold is not None:
+        for r in rows:
+            r["fold"] = args.fold
 
     scores = pd.DataFrame(rows)
     scores.to_csv(args.output, sep="\t", index=False)

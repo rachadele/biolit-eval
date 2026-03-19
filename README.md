@@ -4,14 +4,15 @@ Nextflow pipeline for evaluating the `biolit` literature search agent on transcr
 
 ## Overview
 
-The pipeline samples GEO accessions from a manually curated ground truth (`assets/ground_truth.tsv`, 509 accessions), runs `biolit` to screen and extract metadata, and scores predictions against the ground truth labels.
+The pipeline runs stratified k-fold cross-validation over a manually curated ground truth (`assets/ground_truth.tsv`, 509 accessions). Each fold runs `biolit` to screen and extract metadata; per-fold scores are aggregated and plotted.
 
 **Pipeline steps:**
-1. **SAMPLE** — stratified sample of N positive + N negative accessions
-2. **RUN_BIOLIT** — screens and extracts fields via `biolit` CLI
+1. **CREATE_FOLDS** — stratified k-fold split of all 509 accessions
+2. **RUN_BIOLIT** — screens and extracts fields via `biolit` CLI (one job per fold, parallelized)
 3. **PARSE_PREDICTIONS** — maps biolit output to structured predictions
-4. **SCORE** — computes screening metrics and field extraction accuracy
-5. **PLOT** — bar charts of all metrics
+4. **SCORE** — computes screening metrics and field extraction accuracy per fold
+5. **AGGREGATE** — concatenates per-fold scores into `all_scores.tsv`
+6. **PLOT** — box-and-whisker plots with scatter overlay (one box per metric per fold)
 
 ## Usage
 
@@ -22,29 +23,30 @@ nextflow run main.nf -profile conda
 Override defaults:
 
 ```bash
-nextflow run main.nf -profile conda --n_pos 20 --n_neg 20 --seed 123
+nextflow run main.nf -profile conda --k_folds 10 --seed 123
 ```
 
 ## Parameters
 
 | Parameter | Default | Description |
 |---|---|---|
-| `n_pos` | `50` | Positive examples to sample |
-| `n_neg` | `50` | Negative examples to sample |
-| `seed` | `42` | Random seed |
-| `model` | `claude-haiku-4-5-20251001` | LLM model |
-| `criterion` | *Is there a TF perturbation?* | Biolit screening question |
-| `fields` | `organism_scientific_name,platform_gpl_accession` | Fields to extract |
-| `field_map` | `null` | Optional `biolit_field:truth_col,...` mapping override (see below) |
-| `outdir` | `results/` | Output directory |
+| `k_folds` | `5` | Number of CV folds |
+| `seed` | `42` | Random seed for fold splitting |
+| `field_map` | `null` | Optional `biolit_field:truth_col,...` mapping override |
+| `jaccard_fields` | `tf_name` | Fields scored with Jaccard instead of exact match |
+| `screening_truth_col` | `has_perturbation` | Ground truth column for screening evaluation |
+| `biolit_config` | `config.json` | Biolit config JSON |
+| `outdir` | `results` | Output directory |
 
 ## Output
 
 Results are written to `results/`:
-- `eval_sample.tsv` — sampled accessions with ground truth labels
-- `predictions.tsv` — biolit screening and extraction results
-- `scores.tsv` — accuracy, precision, recall, F1 and per-field extraction accuracy
-- `scores.png` — bar charts of screening and extraction metrics
+- `fold_{i}/biolit_results.csv` — raw biolit output per fold
+- `fold_{i}/predictions.tsv` — parsed predictions per fold
+- `fold_{i}/scores.tsv` — per-fold metrics (includes `fold` column)
+- `fold_{i}/merged.tsv` — predictions joined with ground truth per fold
+- `all_scores.tsv` — all folds concatenated
+- `scores.png` — box-and-whisker plots of screening and extraction metrics
 
 ## Notes
 
