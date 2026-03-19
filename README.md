@@ -10,7 +10,7 @@ The pipeline runs stratified k-fold cross-validation over a manually curated gro
 1. **CREATE_FOLDS** — stratified k-fold split of all 509 accessions
 2. **RUN_BIOLIT** — screens and extracts fields via `biolit` CLI (one job per fold, parallelized)
 3. **PARSE_PREDICTIONS** — maps biolit output to structured predictions
-4. **SCORE** — computes screening metrics and field extraction accuracy per fold
+4. **SCORE** — computes screening metrics and field extraction accuracy per fold (see [Scoring approach](#scoring-approach) below)
 5. **AGGREGATE** — concatenates per-fold scores into `all_scores.tsv`
 6. **PLOT** — box-and-whisker plots with scatter overlay (one box per metric per fold)
 
@@ -47,6 +47,19 @@ Results are written to `results/`:
 - `fold_{i}/merged.tsv` — predictions joined with ground truth per fold
 - `all_scores.tsv` — all folds concatenated
 - `scores.png` — box-and-whisker plots of screening and extraction metrics
+
+## Scoring approach
+
+Two separate evaluations are reported per fold:
+
+**Screening** (`group=screening`) — evaluated over all records in the fold:
+- Accuracy, precision, recall, F1 against the `has_perturbation` ground truth label.
+
+**Field extraction** (`group=extraction_exact` / `extraction_jaccard`) — evaluated only on **true positives** (records where `has_perturbation=True` AND `screened_positive=True`):
+- Exact-match accuracy for `perturbation_method`, `organism`, `platform`.
+- Mean Jaccard similarity for `tf_name` (handles aliases and multi-value fields).
+
+Evaluating extraction on true positives only cleanly separates extraction quality from screening recall. A record biolit failed to screen is a screening error, not a field extraction error.
 
 ## Notes
 

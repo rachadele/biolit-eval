@@ -76,7 +76,9 @@ def main():
 
     y_true = merged[args.screening_truth_col].astype(bool)
     y_pred = merged["screened_positive"].astype(bool)
-    pos = merged[merged[args.screening_truth_col] == True]
+    # Field extraction is evaluated only on true positives (ground truth positive
+    # AND biolit screened positive), isolating extraction quality from screening recall.
+    pos = merged[(merged[args.screening_truth_col] == True) & (merged["screened_positive"] == True)]
 
     rows = [
         {"metric": "accuracy",  "group": "screening", "value": accuracy_score(y_true, y_pred),                   "n": len(merged)},
@@ -124,11 +126,11 @@ def main():
     exact = scores[scores["group"] == "extraction_exact"].set_index("metric")
     jaccard_ex = scores[scores["group"] == "extraction_jaccard"].set_index("metric")
     if not exact.empty:
-        lines += ["", "=== Field Extraction Accuracy (positives only) ==="]
+        lines += ["", "=== Field Extraction Accuracy (true positives only) ==="]
         for metric, row in exact.iterrows():
             lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
     if not jaccard_ex.empty:
-        lines += ["", "=== Field Extraction Mean Jaccard (positives only) ==="]
+        lines += ["", "=== Field Extraction Mean Jaccard (true positives only) ==="]
         for metric, row in jaccard_ex.iterrows():
             lines.append(f"  {metric:<22} {row['value']:.3f}  (n={int(row['n'])})")
 
