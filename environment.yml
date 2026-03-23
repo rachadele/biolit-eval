@@ -7,6 +7,3 @@ dependencies:
   - pandas
   - scikit-learn
   - matplotlib
-  - pip
-  - pip:
-    - /Users/Rachel/Documents/lit-search-agent
