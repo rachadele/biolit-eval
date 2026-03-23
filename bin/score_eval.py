@@ -16,12 +16,19 @@ def norm(val):
     return str(val).strip().lower()
 
 
-def to_set(val):
-    """Normalize a field value to a set of lowercase tokens, splitting on , / ;"""
+def to_set(val, synonym_map=None):
+    """Normalize a field value to a set of lowercase tokens, splitting on , / ;
+
+    If synonym_map is provided, each token is resolved to its canonical form
+    before the set is returned (e.g. 'p53' → 'tp53').
+    """
     s = norm(val)
     if not s:
         return set()
-    return {t.strip() for t in re.split(r"[,/;]+", s) if t.strip()}
+    tokens = {t.strip() for t in re.split(r"[,/;]+", s) if t.strip()}
+    if synonym_map:
+        tokens = {synonym_map.get(t, t) for t in tokens}
+    return tokens
 
 
 def jaccard(a, b):
@@ -32,12 +39,15 @@ def jaccard(a, b):
     return len(a & b) / len(a | b)
 
 
-def field_jaccard(merged, pred_col, truth_col):
+def field_jaccard(merged, pred_col, truth_col, synonym_map=None):
     """Mean Jaccard similarity over rows where ground truth is non-empty."""
     sub = merged[merged[truth_col].apply(norm) != ""]
     if sub.empty:
         return float("nan"), 0
-    scores = sub.apply(lambda r: jaccard(to_set(r[pred_col]), to_set(r[truth_col])), axis=1)
+    scores = sub.apply(
+        lambda r: jaccard(to_set(r[pred_col], synonym_map), to_set(r[truth_col], synonym_map)),
+        axis=1,
+    )
     return scores.mean(), len(sub)
 
 
@@ -52,13 +62,21 @@ def main():
                         help="Optional key:value,... override for biolit→ground-truth column mapping")
     parser.add_argument("--jaccard_fields", default=None,
                         help="Comma-separated field names to score with Jaccard instead of exact match")
+    parser.add_argument("--synonym_map", default=None,
+                        help="Path to gene_synonyms.json for synonym-aware Jaccard scoring of TF names")
     parser.add_argument("--output", required=True)
     parser.add_argument("--merged_output", default=None, help="Optional path to write merged predictions+ground truth TSV")
-    parser.add_argument("--fold", type=int, default=None, help="Fold index to stamp into output rows")
+    parser.add_argument("--errors_output", default=None, help="Optional path to write false positive / false negative rows TSV")
+    parser.add_argument("--bootstrap", type=int, default=None, help="Bootstrap index to stamp into output rows")
     args = parser.parse_args()
 
     with open(args.config) as f:
         config = json.load(f)
+
+    synonym_map = None
+    if args.synonym_map:
+        with open(args.synonym_map) as f:
+            synonym_map = json.load(f)
     # fields dict keys are biolit output column names; default truth col = same name
     field_map = {k: k for k in config.get("fields", {}).keys()}
     jaccard_fields = set(args.jaccard_fields.split(",")) if args.jaccard_fields else set()
@@ -93,7 +111,7 @@ def main():
         if pred_col not in merged.columns or tc not in merged.columns:
             continue
         if biolit_field in jaccard_fields:
-            val, n = field_jaccard(pos, pred_col, tc)
+            val, n = field_jaccard(pos, pred_col, tc, synonym_map=synonym_map)
             group = "extraction_jaccard"
         else:
             sub = pos[pos[tc].apply(norm) != ""]
@@ -102,15 +120,27 @@ def main():
             group = "extraction_exact"
         rows.append({"metric": truth_col, "group": group, "value": val, "n": n})
 
-    if args.fold is not None:
+    if args.bootstrap is not None:
         for r in rows:
-            r["fold"] = args.fold
+            r["bootstrap"] = args.bootstrap
 
     scores = pd.DataFrame(rows)
     scores.to_csv(args.output, sep="\t", index=False)
 
     if args.merged_output:
+        if args.bootstrap is not None:
+            merged["bootstrap"] = args.bootstrap
         merged.to_csv(args.merged_output, sep="\t", index=False)
+
+    if args.errors_output:
+        fp = merged[(~y_true) & y_pred].copy()
+        fn = merged[y_true & (~y_pred)].copy()
+        fp["error_type"] = "fp"
+        fn["error_type"] = "fn"
+        errors = pd.concat([fp, fn], ignore_index=True)
+        if args.bootstrap is not None:
+            errors["bootstrap"] = args.bootstrap
+        errors.to_csv(args.errors_output, sep="\t", index=False)
 
     # human-readable report
     screening = scores[scores["group"] == "screening"].set_index("metric")

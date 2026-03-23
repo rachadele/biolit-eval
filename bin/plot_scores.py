@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot screening and extraction metrics from all_scores.tsv (k-fold CV)."""
+"""Plot screening and extraction metrics from all_scores.tsv (bootstrap CI)."""
 
 import argparse
 
@@ -42,8 +42,8 @@ def main():
     boxplot_panel(ax3, scores, "extraction_jaccard",
                   "Field extraction (Jaccard)", "Mean Jaccard similarity")
 
-    k = scores["fold"].nunique() if "fold" in scores.columns else "?"
-    fig.suptitle(f"K-Fold CV  (k={k})")
+    n = scores["bootstrap"].nunique() if "bootstrap" in scores.columns else "?"
+    fig.suptitle(f"Bootstrap CI  (n={n})")
     fig.tight_layout()
     fig.savefig(args.output, dpi=150, bbox_inches="tight")
     print(f"Saved plot → {args.output}")

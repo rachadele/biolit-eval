@@ -11,11 +11,11 @@ def main():
 
     dfs = [pd.read_csv(p, sep="\t") for p in args.scores]
     combined = pd.concat(dfs, ignore_index=True)
-    if "fold" not in combined.columns:
-        raise ValueError("Input scores files missing 'fold' column — re-run score_eval.py with --fold.")
+    if "bootstrap" not in combined.columns:
+        raise ValueError("Input scores files missing 'bootstrap' column — re-run score_eval.py with --bootstrap.")
     combined.to_csv(args.output, sep="\t", index=False)
-    folds = sorted(combined["fold"].unique())
-    print(f"Aggregated {len(folds)} folds, {len(combined)} rows → {args.output}")
+    bootstraps = sorted(combined["bootstrap"].unique())
+    print(f"Aggregated {len(bootstraps)} bootstraps, {len(combined)} rows → {args.output}")
 
 if __name__ == "__main__":
     main()
