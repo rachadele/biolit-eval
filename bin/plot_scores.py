@@ -12,13 +12,16 @@ def boxplot_panel(ax, scores, group_label, title, ylabel):
     if sub.empty:
         ax.set_visible(False)
         return
+    label_map = {"tf_name": "TF name"}
     metrics = sub["metric"].unique()
     plot_data = [sub[sub["metric"] == m]["value"].dropna().tolist() for m in metrics]
-    ax.boxplot(plot_data, labels=metrics, patch_artist=True)
+    labels = [label_map.get(m, m) for m in metrics]
+    ax.boxplot(plot_data, labels=labels, patch_artist=True)
     ax.set_ylim(0, 1.08)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.tick_params(axis="x", rotation=20)
+    ax.set_ylabel(ylabel, fontsize=20)
+    ax.set_title(title, fontsize=20)
+    ax.tick_params(axis="x", rotation=20, labelsize=20)
+    ax.tick_params(axis="y", labelsize=13)
     for i, vals in enumerate(plot_data, start=1):
         ax.scatter([i] * len(vals), vals, alpha=0.5, s=20, color="black", zorder=3)
 
@@ -43,7 +46,7 @@ def main():
                   "Field extraction (Jaccard)", "Mean Jaccard similarity")
 
     n = scores["bootstrap"].nunique() if "bootstrap" in scores.columns else "?"
-    fig.suptitle(f"Bootstrap CI  (n={n})")
+    fig.suptitle(f"Bootstrap CI  (n={n})", fontsize=20)
     fig.tight_layout()
     fig.savefig(args.output, dpi=150, bbox_inches="tight")
     print(f"Saved plot → {args.output}")

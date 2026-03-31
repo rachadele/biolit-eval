@@ -24,11 +24,12 @@ def grouped_barh(ax, fp_counts, fn_counts, title, top_n=15):
     ax.barh([i + height / 2 for i in y], fp_vals, height, label="FP", color="salmon")
     ax.barh([i - height / 2 for i in y], fn_vals, height, label="FN", color="steelblue")
     ax.set_yticks(list(y))
-    ax.set_yticklabels(cats, fontsize=8)
-    ax.set_title(title)
-    ax.set_xlabel("Count")
+    ax.set_yticklabels(cats, fontsize=20)
+    ax.set_title(title, fontsize=20)
+    ax.set_xlabel("Count", fontsize=20)
+    ax.tick_params(axis="x", labelsize=20)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=20)
 
 
 def main():
@@ -57,15 +58,16 @@ def main():
             bootstrap_counts.get("fn", pd.Series(0, index=bootstraps)).loc[bootstraps],
             width, label="FN", color="steelblue")
     ax1.set_xticks(list(x))
-    ax1.set_xticklabels([f"b{b}" for b in bootstraps], rotation=45, ha="right", fontsize=7)
-    ax1.set_ylabel("Count")
-    ax1.set_title("FP / FN counts per bootstrap")
+    ax1.set_xticklabels([f"b{b}" for b in bootstraps], rotation=45, ha="right", fontsize=20)
+    ax1.set_ylabel("Count", fontsize=20)
+    ax1.set_title("FP / FN counts per bootstrap", fontsize=20)
+    ax1.tick_params(axis="y", labelsize=20)
     ax1.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax1.legend()
+    ax1.legend(fontsize=20)
 
     # --- Panel 2: TF names (FP predicted vs FN truth) ---
     fp_tfs = (fp["tf_name_pred"].dropna().astype(str)
-              .str.split(r"\s*,\s*").explode().str.strip())
+              .str.split(r"\s*,\s*").explode().str.strip().str.lower())
     fp_tfs = fp_tfs[fp_tfs.str.len() > 0]
     fp_tf_counts = fp_tfs.value_counts()
 
@@ -84,7 +86,7 @@ def main():
     total_fp = len(fp)
     total_fn = len(fn)
     n = df["bootstrap"].nunique() if "bootstrap" in df.columns else "?"
-    fig.suptitle(f"Screening errors  (n={n}, total FP={total_fp}, FN={total_fn})", fontsize=13)
+    fig.suptitle(f"Screening errors  (n={n}, total FP={total_fp}, FN={total_fn})", fontsize=20)
     fig.tight_layout()
     fig.savefig(args.output, dpi=150, bbox_inches="tight")
     print(f"Saved plot → {args.output}")

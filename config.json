@@ -6,6 +6,6 @@
 	},
 	"criterion": "Does this experiment include a direct genetic or molecular manipulation of a transcription factor (TF)? Answer YES if a TF is knocked out (KO/cKO/null), knocked down (siRNA/shRNA/antisense), overexpressed (transgene, induction, retroviral/lentiviral vector), mutated (point mutation, dominant-negative, truncation), or expressed as a fusion protein (e.g., AML1-ETO, ETV6-RUNX1). Answer NO if: (1) a non-TF gene such as a kinase, receptor, or signaling molecule is the primary perturbation and a TF merely responds downstream; (2) a TF is only measured or observed as a readout without being directly manipulated; or (3) a TF genotype (e.g., Trp53-null) describes the background strain rather than the experimental variable being tested.",
 	"model": "claude-sonnet-4-6",
-	"max_chars": 100000,
+	"max_tokens": 25000,
 	"unpaywall_email": "raschwar@student.ubc.ca"
 }

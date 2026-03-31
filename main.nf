@@ -37,6 +37,8 @@ process RUN_BIOLIT {
     """
     biolit ${accessions} \
         --config ${biolit_config} \
+        --model ${params.model} \
+        --max-tokens ${params.max_tokens} \
         --output results.csv
     mv run_*/results.csv biolit_results.csv
     """
