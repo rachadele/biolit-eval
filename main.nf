@@ -24,14 +24,14 @@ process RUN_BIOLIT {
     conda '/Users/Rachel/miniconda3'
     tag "bootstrap_${bootstrap_id}"
     storeDir "${params.outdir}/bootstrap_${bootstrap_id}"
-    publishDir { "${params.outdir}/bootstrap_${bootstrap_id}" }, mode: 'move'
+    publishDir { "${params.outdir}/bootstrap_${bootstrap_id}" }, mode: 'move', pattern: 'biolit_results.csv'
 
     input:
     tuple val(bootstrap_id), path(accessions), path(biolit_config)
 
     output:
     tuple val(bootstrap_id), path('biolit_results.csv'), emit: csv
-    path 'artifacts', optional: true
+    path 'artifacts', optional: true, emit: artifacts
 
     script:
     """
@@ -41,6 +41,7 @@ process RUN_BIOLIT {
         --max-tokens ${params.max_tokens} \
         --output results.csv
     mv run_*/results.csv biolit_results.csv
+    [ -d run_*/artifacts ] && mv run_*/artifacts artifacts || true
     """
 }
 
@@ -142,7 +143,7 @@ process PLOT_ERRORS {
     publishDir params.outdir, mode: 'copy'
 
     input:
-    path screening_errors
+    path all_merged
 
     output:
     path 'errors.png'
@@ -150,7 +151,7 @@ process PLOT_ERRORS {
     script:
     """
     plot_errors.py \
-        --errors ${screening_errors} \
+        --merged ${all_merged} \
         --output errors.png
     """
 }
@@ -170,6 +171,27 @@ process PLOT {
         --scores ${all_scores} \
         --screening_truth_col ${params.screening_truth_col} \
         --output scores.png
+    """
+}
+
+process AUDIT_ERRORS {
+    publishDir params.outdir, mode: 'copy'
+
+    input:
+    path all_merged
+    path ground_truth
+    val artifacts_dirs
+
+    output:
+    path 'errors_audit.tsv'
+
+    script:
+    """
+    audit_false_positives.py \
+        --merged ${all_merged} \
+        --ground_truth ${ground_truth} \
+        --artifacts_dirs ${artifacts_dirs.join(' ')} \
+        --output errors_audit.tsv
     """
 }
 
@@ -221,9 +243,15 @@ workflow {
         .map { bootstrap_id, merged_tsv -> merged_tsv }
         .collect()
 
+    all_artifacts_ch = RUN_BIOLIT.out.artifacts
+        .map { it.toAbsolutePath().toString() }
+        .collect()
+        .ifEmpty { error "No artifacts directories found" }
+
     AGGREGATE(all_scores_ch)
     AGGREGATE_ERRORS(all_errors_ch)
     AGGREGATE_MERGED(all_merged_ch)
     PLOT(AGGREGATE.out)
-    PLOT_ERRORS(AGGREGATE_ERRORS.out)
+    PLOT_ERRORS(AGGREGATE_MERGED.out)
+    AUDIT_ERRORS(AGGREGATE_MERGED.out, ground_truth, all_artifacts_ch)
 }

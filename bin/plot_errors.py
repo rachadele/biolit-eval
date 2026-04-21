@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot screening error analysis from screening_errors.tsv."""
+"""Plot screening error analysis from all_merged.tsv."""
 
 import argparse
 
@@ -10,7 +10,6 @@ import pandas as pd
 
 def grouped_barh(ax, fp_counts, fn_counts, title, top_n=15):
     """Horizontal grouped bar chart with FP/FN side by side for shared categories."""
-    # Union of top_n categories from each, ranked by combined count
     combined = (fp_counts.add(fn_counts, fill_value=0)
                 .sort_values(ascending=False)
                 .head(top_n))
@@ -32,47 +31,81 @@ def grouped_barh(ax, fp_counts, fn_counts, title, top_n=15):
     ax.legend(fontsize=20)
 
 
+def stochasticity_panel(ax, merged):
+    """Stacked horizontal bar: error bootstraps vs correct bootstraps per accession.
+
+    Only shows accessions sampled in more than one bootstrap — stochasticity
+    is only meaningful when an accession can be compared across draws.
+    """
+    is_fp = (merged["screened_positive"] == True) & (merged["has_perturbation"] == False)
+    is_fn = (merged["screened_positive"] == False) & (merged["has_perturbation"] == True)
+    merged = merged.copy()
+    merged["error_type"] = "correct"
+    merged.loc[is_fp, "error_type"] = "fp"
+    merged.loc[is_fn, "error_type"] = "fn"
+
+    # Only accessions that were ever an error
+    error_accs = merged.loc[merged["error_type"] != "correct", "geo_accession"].unique()
+    sub = merged[merged["geo_accession"].isin(error_accs)]
+
+    counts = (sub.groupby(["geo_accession", "error_type"]).size()
+                .unstack(fill_value=0))
+    for col in ["fp", "fn", "correct"]:
+        if col not in counts:
+            counts[col] = 0
+    counts["n_total"] = counts[["fp", "fn", "correct"]].sum(axis=1)
+
+    # Only show accessions sampled more than once
+    counts = counts[counts["n_total"] > 1].sort_values("fp", ascending=True)
+
+    if counts.empty:
+        ax.text(0.5, 0.5, "All errors are one-off\n(each accession sampled once)",
+                ha="center", va="center", transform=ax.transAxes, fontsize=14)
+        ax.set_title("LLM stochasticity", fontsize=20)
+        return
+
+    y = range(len(counts))
+    ax.barh(list(y), counts["fp"], color="salmon", label="FP")
+    ax.barh(list(y), counts["fn"], left=counts["fp"], color="steelblue", label="FN")
+    ax.barh(list(y), counts["correct"], left=counts["fp"] + counts["fn"],
+            color="lightgrey", label="correct")
+    ax.set_yticks(list(y))
+    ax.set_yticklabels(counts.index, fontsize=12)
+    ax.set_xlabel("Bootstrap appearances", fontsize=16)
+    ax.set_title("LLM stochasticity", fontsize=20)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    ax.tick_params(axis="x", labelsize=16)
+    ax.legend(fontsize=16)
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--errors", required=True, help="Path to screening_errors.tsv")
+    parser.add_argument("--merged", required=True, help="Path to all_merged.tsv")
     parser.add_argument("--output", required=True, help="Output PNG path")
     parser.add_argument("--top_n", type=int, default=15, help="Top N items in bar charts")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.errors, sep="\t")
-    fp = df[df["error_type"] == "fp"]
-    fn = df[df["error_type"] == "fn"]
+    merged = pd.read_csv(args.merged, sep="\t")
+
+    is_fp = (merged["screened_positive"] == True) & (merged["has_perturbation"] == False)
+    is_fn = (merged["screened_positive"] == False) & (merged["has_perturbation"] == True)
+    fp = merged[is_fp]
+    fn = merged[is_fn]
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 7))
     ax1, ax2, ax3 = axes
 
-    # --- Panel 1: FP/FN counts per bootstrap ---
-    bootstrap_counts = df.groupby(["bootstrap", "error_type"]).size().unstack(fill_value=0)
-    bootstraps = sorted(bootstrap_counts.index)
-    x = range(len(bootstraps))
-    width = 0.35
-    ax1.bar([i - width / 2 for i in x],
-            bootstrap_counts.get("fp", pd.Series(0, index=bootstraps)).loc[bootstraps],
-            width, label="FP", color="salmon")
-    ax1.bar([i + width / 2 for i in x],
-            bootstrap_counts.get("fn", pd.Series(0, index=bootstraps)).loc[bootstraps],
-            width, label="FN", color="steelblue")
-    ax1.set_xticks(list(x))
-    ax1.set_xticklabels([f"b{b}" for b in bootstraps], rotation=45, ha="right", fontsize=20)
-    ax1.set_ylabel("Count", fontsize=20)
-    ax1.set_title("FP / FN counts per bootstrap", fontsize=20)
-    ax1.tick_params(axis="y", labelsize=20)
-    ax1.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax1.legend(fontsize=20)
+    # --- Panel 1: LLM stochasticity ---
+    stochasticity_panel(ax1, merged)
 
     # --- Panel 2: TF names (FP predicted vs FN truth) ---
     fp_tfs = (fp["tf_name_pred"].dropna().astype(str)
-              .str.split(r"\s*,\s*").explode().str.strip().str.lower())
+              .str.split(r"\s*,\s*").explode().str.strip().str.upper())
     fp_tfs = fp_tfs[fp_tfs.str.len() > 0]
     fp_tf_counts = fp_tfs.value_counts()
 
     fn_tfs = (fn["tf_name_truth"].dropna().astype(str)
-              .str.split(r"\s*,\s*").explode().str.strip().str.lower())
+              .str.split(r"\s*,\s*").explode().str.strip().str.upper())
     fn_tfs = fn_tfs[fn_tfs.str.len() > 0]
     fn_tf_counts = fn_tfs.value_counts()
 
@@ -83,10 +116,7 @@ def main():
     fn_org_counts = fn["organism_truth"].fillna("unknown").value_counts()
     grouped_barh(ax3, fp_org_counts, fn_org_counts, "Organism", args.top_n)
 
-    total_fp = len(fp)
-    total_fn = len(fn)
-    n = df["bootstrap"].nunique() if "bootstrap" in df.columns else "?"
-    fig.suptitle(f"Screening errors  (n={n}, total FP={total_fp}, FN={total_fn})", fontsize=20)
+    fig.suptitle("Screening errors", fontsize=20)
     fig.tight_layout()
     fig.savefig(args.output, dpi=150, bbox_inches="tight")
     print(f"Saved plot → {args.output}")
