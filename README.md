@@ -2,6 +2,16 @@
 
 Nextflow pipeline for evaluating the `biolit` literature search agent on transcription factor perturbation experiments in GEO.
 
+## Results
+
+Pilot run: n=5 bootstraps, 30 records each, `claude-sonnet-4-6`, 25 000 token context.
+
+![Bootstrap CI scores: screening accuracy ~0.70, precision ~0.69, recall ~0.97, F1 ~0.80; organism and platform extraction ~1.0; TF name Jaccard ~0.69](docs/eval_scores.png)
+*Screening and field-extraction metrics across bootstrap resamples. Each point is one bootstrap; box shows IQR.*
+
+![Screening error breakdown: FP-heavy accessions, most-confused TF names (TP53, RUNX1, YAP1), and organism distribution of errors](docs/eval_errors.png)
+*Breakdown of false positives and false negatives by GEO accession (stochasticity panel), TF name, and organism.*
+
 ## Overview
 
 The pipeline runs stratified k-fold cross-validation over a manually curated ground truth (`assets/ground_truth.tsv`, 509 accessions). Each fold runs `biolit` to screen and extract metadata; per-fold scores are aggregated and plotted.
