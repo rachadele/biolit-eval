@@ -23,12 +23,11 @@ def grouped_barh(ax, fp_counts, fn_counts, title, top_n=15):
     ax.barh([i + height / 2 for i in y], fp_vals, height, label="FP", color="salmon")
     ax.barh([i - height / 2 for i in y], fn_vals, height, label="FN", color="steelblue")
     ax.set_yticks(list(y))
-    ax.set_yticklabels(cats, fontsize=20)
+    ax.set_yticklabels(cats, fontsize=13)
     ax.set_title(title, fontsize=20)
     ax.set_xlabel("Count", fontsize=20)
     ax.tick_params(axis="x", labelsize=20)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax.legend(fontsize=20)
 
 
 def stochasticity_panel(ax, merged):
@@ -70,12 +69,11 @@ def stochasticity_panel(ax, merged):
     ax.barh(list(y), counts["correct"], left=counts["fp"] + counts["fn"],
             color="lightgrey", label="correct")
     ax.set_yticks(list(y))
-    ax.set_yticklabels(counts.index, fontsize=12)
+    ax.set_yticklabels(counts.index, fontsize=16)
     ax.set_xlabel("Bootstrap appearances", fontsize=16)
     ax.set_title("LLM stochasticity", fontsize=20)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     ax.tick_params(axis="x", labelsize=16)
-    ax.legend(fontsize=16)
 
 
 def main():
@@ -116,8 +114,12 @@ def main():
     fn_org_counts = fn["organism_truth"].fillna("unknown").value_counts()
     grouped_barh(ax3, fp_org_counts, fn_org_counts, "Organism", args.top_n)
 
+    handles, labels = ax1.get_legend_handles_labels()
     fig.suptitle("Screening errors", fontsize=20)
     fig.tight_layout()
+    fig.subplots_adjust(right=0.88)
+    fig.legend(handles, labels, loc="center left", bbox_to_anchor=(0.89, 0.5),
+               fontsize=18, framealpha=0.9)
     fig.savefig(args.output, dpi=150, bbox_inches="tight")
     print(f"Saved plot → {args.output}")
 
